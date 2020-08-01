@@ -7,12 +7,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.demo.Percolator;
 import javax.websocket.server.PathParam;
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api")
 public class MainController {
-
-
     private Percolator percolator;
 
     @Autowired
@@ -61,7 +60,11 @@ public class MainController {
         return results.toString();
     }
 
-
+    @GetMapping("/monitor")
+    public String monitor() throws IOException {
+        Percolator p = new Percolator();
+        return p.monitorQueries();
+    }
 }
 
 
