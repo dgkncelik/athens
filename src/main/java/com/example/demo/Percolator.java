@@ -3,22 +3,15 @@ package com.example.demo;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.core.SimpleAnalyzer;
-import org.apache.lucene.analysis.core.KeywordAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.index.memory.MemoryIndex;
 import org.apache.lucene.monitor.*;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.Matches;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.util.Version;
 import org.springframework.stereotype.Component;
 
@@ -26,56 +19,46 @@ import org.springframework.stereotype.Component;
 public class Percolator {
     public static final Version VERSION = Version.LUCENE_8_6_0;
     public static final String F_CONTENT = "content";
-    private List<Query> queries;
-    private MemoryIndex index;
+    private HashMap<String, AthensQuery> queries;
+    private Presearcher p;
+    private Analyzer a;
+    private Monitor m;
 
-    public Percolator() {
-        queries = new ArrayList<Query>();
-        index = new MemoryIndex();
+    public Percolator() throws IOException{
+        this.queries = new HashMap<>();
+        this.p = new TermFilteredPresearcher();
+        this.a = new SimpleAnalyzer();
+        this.m = new Monitor(a, p);
     }
 
-    public void addQuery(String query) throws ParseException {
-        Analyzer analyzer = new SimpleAnalyzer();
-        QueryParser parser = new QueryParser(F_CONTENT, analyzer);
-        queries.add(parser.parse(query));
-    }
+    public void addQuery(AthensQuery athensQuery){
+        String queryId = athensQuery.generateQueryId();
+        Query queryObject = athensQuery.generateQueryObject();
+        this.queries.put(queryId, athensQuery);
+        MonitorQuery mq =  new MonitorQuery(queryId,
+                                            queryObject);
+        try{
+            this.m.register(mq);
+        } catch (IOException ignored){
 
-
-    public List<Query> getMatchingQueries(String doc) {
-        synchronized (index) {
-            index.reset();
-            index.addField(F_CONTENT, doc, new SimpleAnalyzer());
         }
-
-        List<Query> matching = new ArrayList<Query>();
-        for (Query qry : queries) {
-            if (index.search(qry) > 0.0f) {
-                matching.add(qry);
-            }
-        }
-
-        return matching;
     }
 
-    public String monitorQueries() throws IOException {
-        Presearcher p = new TermFilteredPresearcher();
-        Analyzer a = new SimpleAnalyzer();
-        Monitor m = new Monitor(a, p);
-
-        Query wildcardQuery = new WildcardQuery(new Term("first", "hello*"));
-        MonitorQuery mq = new MonitorQuery("query1", wildcardQuery);
-        m.register(mq);
-
+    public List<AthensQuery> percolateText(String text){
+        List<AthensQuery> results = new ArrayList<>();
+        MatchingQueries<QueryMatch> matches;
         Document document = new Document();
-        document.add(new TextField("first", "hellooooo", null));
-
-        MatchingQueries<QueryMatch> matches = m.match(document, QueryMatch.SIMPLE_MATCHER);
-        for (QueryMatch qm: matches.getMatches()){
-            System.out.println(qm.toString());
-            System.out.println(qm.getQueryId());
-            return qm.toString();
+        document.add(new TextField("query", text, null));
+        try {
+            matches = this.m.match(document, QueryMatch.SIMPLE_MATCHER);
+        } catch (IOException i){
+            return results;
         }
-        return "NO RESULT";
+        for (QueryMatch qm: matches.getMatches()){
+            String queryId = qm.getQueryId();
+            AthensQuery r = this.queries.get(queryId);
+            results.add(r);
+        }
+        return results;
     }
-
 }
