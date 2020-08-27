@@ -36,7 +36,9 @@ public class AthensQuery {
     public Query generateQueryObject(){
         try {
             Analyzer sa = new SimpleAnalyzer();
-            return new QueryParser("query", sa).parse(this.queryString);
+            QueryParser qp = new QueryParser("query", sa);
+            qp.setAllowLeadingWildcard(true);
+            return qp.parse(this.queryString);
         } catch (ParseException p){
             return null;
         }

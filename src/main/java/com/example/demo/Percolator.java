@@ -39,8 +39,8 @@ public class Percolator {
                                             queryObject);
         try{
             this.m.register(mq);
-        } catch (IOException ignored){
-
+        } catch (Exception e){
+            System.out.println("ERROR");
         }
     }
 
